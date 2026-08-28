@@ -10,6 +10,7 @@ jobs:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
 
@@ -30,6 +31,7 @@ jobs:
           npm ci
           npm run build
           npm run camera:setup
+          npm prune --omit=dev
 
       - name: Setup desktop app
         run: |

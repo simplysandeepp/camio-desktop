@@ -285,7 +285,39 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('will-quit', () => {
-  if (cameraProcess) cameraProcess.kill('SIGTERM');
-  if (serverProcess) serverProcess.kill('SIGTERM');
+function terminateChildren() {
+  const procs = [cameraProcess, serverProcess].filter((p) => p && p.exitCode === null);
+  if (procs.length === 0) return Promise.resolve();
+
+  return new Promise((resolve) => {
+    let remaining = procs.length;
+    const finish = () => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearTimeout(forceKillTimer);
+        resolve();
+      }
+    };
+    const forceKillTimer = setTimeout(() => {
+      for (const p of procs) {
+        if (p.exitCode === null) p.kill('SIGKILL');
+      }
+    }, 5000);
+
+    for (const p of procs) {
+      p.once('exit', finish);
+      p.kill('SIGTERM');
+    }
+  });
+}
+
+let readyToQuit = false;
+app.on('before-quit', (event) => {
+  if (readyToQuit) return;
+  event.preventDefault();
+  isQuitting = true;
+  terminateChildren().then(() => {
+    readyToQuit = true;
+    app.quit();
+  });
 });
