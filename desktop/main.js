@@ -228,6 +228,7 @@ function setupIpcHandlers() {
     const lines = [
       `CAMERA_SOURCE=${envData.cameraSource}`,
       `CAMERA_DEVICE=${envData.cameraDevice}`,
+      `CAMERA_FPS=30`,
       `CAMIO_USER=${envData.username}`,
       `CAMIO_PASSWORD_HASH=${envData.hash}`,
       `SESSION_SECRET=${envData.secret}`,
