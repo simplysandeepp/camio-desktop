@@ -1,0 +1,59 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup primary repo (web app)
+        run: |
+          cd app
+          npm ci
+          npm run build
+          npm run camera:setup
+
+      - name: Setup desktop app
+        run: |
+          cd desktop
+          npm ci
+
+      - name: Build Electron App
+        run: |
+          cd desktop
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            npm run build:mac
+          else
+            npm run build:linux
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            desktop/out/*.AppImage
+            desktop/out/*.deb
+            desktop/out/*.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

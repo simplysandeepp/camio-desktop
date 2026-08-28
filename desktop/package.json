@@ -4,7 +4,42 @@
   "description": "",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.camio.desktop",
+    "productName": "Camio",
+    "directories": {
+      "output": "out"
+    },
+    "files": [
+      "main.js",
+      "wizard.html",
+      "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../app",
+        "to": "app",
+        "filter": [
+          "**/*",
+          "!node_modules/.cache",
+          "!.next/cache",
+          "!.git"
+        ]
+      }
+    ],
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icons/icon.icns"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "assets/icons",
+      "category": "Utility"
+    }
   },
   "keywords": [],
   "author": "",
