@@ -210,7 +210,7 @@ function setupIpcHandlers() {
 
   ipcMain.handle('hash-password', async (event, password) => {
     return new Promise((resolve) => {
-      const proc = spawn('node', ['scripts/hash-password.mjs', '--', password], { cwd: APP_DIR });
+      const proc = spawn('node', ['scripts/hash-password.mjs', password], { cwd: APP_DIR });
       let output = '';
       proc.stdout.on('data', d => { output += d; });
       proc.on('close', () => {
