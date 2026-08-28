@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn, execSync } = require('child_process');
@@ -60,39 +60,109 @@ function waitForServer() {
   poll();
 }
 
-function createWindow() {
-  if (mainWindow) return;
+let tray = null;
+let isQuitting = false;
 
-  mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true
-    },
-    icon: path.join(__dirname, 'assets/icons/icon-512x512.png')
-  });
+function createTray() {
+  if (tray) return;
 
-  mainWindow.loadURL(`http://localhost:${appPort}`);
+  // Use appropriate size
+  let iconName = 'tray-24x24.png';
+  if (process.platform === 'darwin') {
+    iconName = 'tray-22x22.png';
+  }
   
-  mainWindow.on('closed', () => {
-    mainWindow = null;
+  const iconPath = path.join(__dirname, 'assets/icons', iconName);
+  // Ensure native image for template support on macOS (changes color based on light/dark mode)
+  const { nativeImage } = require('electron');
+  let trayIcon = nativeImage.createFromPath(iconPath);
+  if (process.platform === 'darwin') {
+    trayIcon = trayIcon.resize({ width: 22, height: 22 });
+    trayIcon.setTemplateImage(true);
+  }
+
+  tray = new Tray(trayIcon);
+  updateTrayMenu('Connecting...');
+
+  // Poll status every 5 seconds
+  setInterval(pollCameraStatus, 5000);
+}
+
+function updateTrayMenu(statusText) {
+  if (!tray) return;
+
+  const contextMenu = Menu.buildFromTemplate([
+    { label: `Camio — ${statusText}`, enabled: false },
+    { type: 'separator' },
+    { label: 'Open Dashboard', click: () => { shell.openExternal(`http://localhost:${appPort}`); } },
+    { label: 'Settings', click: showWizard },
+    { type: 'separator' },
+    { label: 'Quit', click: () => { isQuitting = true; app.quit(); } }
+  ]);
+  tray.setContextMenu(contextMenu);
+}
+
+function pollCameraStatus() {
+  const url = `http://localhost:${appPort}/api/stream/status`;
+  http.get(url, (res) => {
+    let data = '';
+    res.on('data', chunk => data += chunk);
+    res.on('end', () => {
+      try {
+        const statuses = JSON.parse(data);
+        const anyLive = Object.values(statuses).some(s => s === 'live');
+        updateTrayMenu(anyLive ? 'Live ●' : 'Camera offline');
+      } catch {
+        updateTrayMenu('Camera offline');
+      }
+    });
+  }).on('error', () => {
+    updateTrayMenu('Disconnected');
   });
+}
+
+function showWizard() {
+  if (mainWindow) {
+    mainWindow.show();
+    return;
+  }
+  mainWindow = new BrowserWindow({
+    width: 900,
+    height: 550,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    },
+    icon: path.join(__dirname, 'assets/icons/icon-512x512.png'),
+    resizable: false
+  });
+  mainWindow.loadFile('wizard.html');
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
+}
+
+function createWindow() {
+  createTray();
+  // We no longer automatically open the Dashboard in an Electron window (Phase 5).
+  // The goal says "after setup, the app lives in the tray/menu bar, not as a visible window"
+  // Wait, the Phase 3 goal said: "Create a BrowserWindow loading http://localhost:<APP_PORT> once ready."
+  // Phase 5 says: "Closing the main window (if one is ever shown, e.g. right after setup) should minimize to tray... 'Open Dashboard' opens the default system browser (not another Electron window)"
+  // So `createWindow` logic needs to be removed/changed to just opening the URL in browser or showing the tray.
+  // We will just open the external browser once server is ready, or do nothing.
 }
 
 function setupIpcHandlers() {
   ipcMain.handle('get-cameras', async () => {
-    // Reuse list-cameras.mjs from submodule by spawning it and capturing stdout
     return new Promise((resolve) => {
       const listProc = spawn('node', ['scripts/list-cameras.mjs'], { cwd: APP_DIR });
       let output = '';
       listProc.stdout.on('data', d => { output += d; });
       listProc.on('close', () => {
-        try {
-          resolve(JSON.parse(output));
-        } catch {
-          resolve([]);
-        }
+        try { resolve(JSON.parse(output)); } catch { resolve([]); }
       });
     });
   });
@@ -130,21 +200,17 @@ function setupIpcHandlers() {
   ipcMain.handle('get-tailscale-url', async () => {
     try {
       const tsStatus = execSync('tailscale status', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-      // rudimentary check if it's running
       if (tsStatus.includes('Logged in')) {
         const ip = execSync('tailscale ip -4', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
         return `http://${ip}:${appPort}`;
       }
-    } catch {
-      // tailscale not installed or not running
-    }
+    } catch {}
     return null;
   });
 
   ipcMain.handle('finish-wizard', async () => {
     if (mainWindow) {
-      mainWindow.close();
-      mainWindow = null;
+      mainWindow.hide();
     }
     spawnProcesses();
   });
@@ -154,18 +220,7 @@ function startApp() {
   setupIpcHandlers();
 
   if (!fs.existsSync(ENV_FILE)) {
-    // Show setup wizard
-    mainWindow = new BrowserWindow({
-      width: 900,
-      height: 550,
-      webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: false
-      },
-      icon: path.join(__dirname, 'assets/icons/icon-512x512.png'),
-      resizable: false
-    });
-    mainWindow.loadFile('wizard.html');
+    showWizard();
     return;
   }
 
@@ -176,16 +231,14 @@ app.whenReady().then(() => {
   startApp();
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0 && fs.existsSync(ENV_FILE)) {
-      createWindow();
+    if (fs.existsSync(ENV_FILE) && !tray) {
+      createTray();
     }
   });
 });
 
 app.on('window-all-closed', () => {
-  // We don't quit immediately if we want a tray app (Phase 5),
-  // but for Phase 3, we can just quit.
-  if (process.platform !== 'darwin') {
+  if (process.platform !== 'darwin' && isQuitting) {
     app.quit();
   }
 });
