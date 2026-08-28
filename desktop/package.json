@@ -1,6 +1,6 @@
 {
   "name": "desktop",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Desktop installer for Camio, a private self-hosted security camera",
   "homepage": "https://github.com/simplysandeepp/camio-desktop",
   "main": "main.js",
@@ -12,6 +12,7 @@
   "build": {
     "appId": "com.camio.desktop",
     "productName": "Camio",
+    "publish": null,
     "directories": {
       "output": "out"
     },
