@@ -1,4 +1,6 @@
 # Camio Desktop
+![Camio Desktop Banner](desktop/assets/banner.webp)
+
 
 This is the desktop installer for [Camio](https://github.com/simplysandeepp/camio), a private, self-hosted security camera web application. 
 
