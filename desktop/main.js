@@ -163,8 +163,47 @@ function setupIpcHandlers() {
       const listProc = spawn('node', ['scripts/list-cameras.mjs'], { cwd: APP_DIR });
       let output = '';
       listProc.stdout.on('data', d => { output += d; });
+      listProc.stderr.on('data', d => { output += d; });
       listProc.on('close', () => {
-        try { resolve(JSON.parse(output)); } catch { resolve([]); }
+        const cameras = [];
+        if (process.platform === 'darwin') {
+          // Output looks like:
+          // [AVFoundation indev @ ...] AVFoundation video devices:
+          // [AVFoundation indev @ ...] [0] MacBook Air Camera
+          // [AVFoundation indev @ ...] [1] Capture screen 0
+          // [AVFoundation indev @ ...] AVFoundation audio devices:
+          const lines = output.split('\n');
+          let inVideo = false;
+          for (const line of lines) {
+            if (line.includes('AVFoundation video devices:')) inVideo = true;
+            else if (line.includes('AVFoundation audio devices:')) inVideo = false;
+            else if (inVideo) {
+              const match = line.match(/\[(\d+)\]\s+(.+)$/);
+              if (match) {
+                // Ignore screens
+                if (!match[2].toLowerCase().includes('screen')) {
+                  cameras.push({ id: match[1], name: match[2].trim(), source: 'mac' });
+                }
+              }
+            }
+          }
+        } else {
+          // Linux v4l2-ctl output:
+          // UVC Camera (046d:0825) (usb-0000:00:14.0-1):
+          //         /dev/video0
+          //         /dev/video1
+          const lines = output.split('\n');
+          let currentName = 'Unknown Camera';
+          for (const line of lines) {
+            if (line.includes('/dev/video')) {
+              cameras.push({ id: line.trim(), name: currentName, source: 'linux' });
+              currentName = 'Unknown Camera'; // reset for next
+            } else if (line.trim().length > 0 && !line.includes('Linux video devices:') && !line.startsWith('  (')) {
+              currentName = line.trim().replace(/:$/, '');
+            }
+          }
+        }
+        resolve(cameras);
       });
     });
   });
