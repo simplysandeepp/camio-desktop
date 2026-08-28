@@ -2,9 +2,9 @@
   "name": "desktop",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "electron ."
   },
   "keywords": [],
   "author": "",
@@ -12,5 +12,9 @@
   "type": "commonjs",
   "dependencies": {
     "sharp": "^0.35.4"
+  },
+  "devDependencies": {
+    "electron": "^44.0.0",
+    "electron-builder": "^26.15.3"
   }
 }

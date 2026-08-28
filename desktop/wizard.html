@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Camio Setup</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      overflow: hidden;
+      background: #000;
+      color: #fff;
+    }
+    .screen {
+      display: none;
+      width: 900px;
+      height: 550px;
+      position: relative;
+    }
+    .screen.active {
+      display: block;
+    }
+    .bg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-size: cover;
+      background-position: center;
+      z-index: 1;
+      opacity: 0.8;
+    }
+    .content {
+      position: relative;
+      z-index: 2;
+      padding: 40px;
+      height: 100%;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+    h1 { font-size: 24px; margin-bottom: 10px; }
+    p { font-size: 14px; margin-bottom: 20px; color: #ccc; }
+    button {
+      padding: 10px 20px;
+      background: #0070f3;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      width: fit-content;
+    }
+    button:hover { background: #0051b3; }
+    button:disabled { background: #555; cursor: not-allowed; }
+    
+    .form-group {
+      margin-bottom: 15px;
+      max-width: 300px;
+    }
+    label { display: block; margin-bottom: 5px; font-size: 12px; }
+    input, select {
+      width: 100%;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #444;
+      background: #222;
+      color: white;
+    }
+    #error { color: #ff4d4f; font-size: 12px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+  <!-- Screen 1: Welcome -->
+  <div id="screen-1" class="screen active">
+    <div class="bg" style="background-image: url('assets/wizard/welcome.webp')"></div>
+    <div class="content">
+      <h1>Welcome to Camio</h1>
+      <p>Camio turns this computer into a private security camera.</p>
+      <button onclick="nextScreen(2)">Get Started</button>
+    </div>
+  </div>
+
+  <!-- Screen 2: Choose Camera -->
+  <div id="screen-2" class="screen">
+    <div class="bg" style="background-image: url('assets/wizard/choose-your-camera.webp')"></div>
+    <div class="content">
+      <h1>Choose your camera</h1>
+      <div class="form-group">
+        <select id="camera-select">
+          <option value="">Loading cameras...</option>
+        </select>
+      </div>
+      <button id="btn-camera" onclick="nextScreen(3)" disabled>Next</button>
+    </div>
+  </div>
+
+  <!-- Screen 3: Set Password -->
+  <div id="screen-3" class="screen">
+    <div class="bg" style="background-image: url('assets/wizard/set-password.webp')"></div>
+    <div class="content">
+      <h1>Set your password</h1>
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="username" value="admin">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="password">
+      </div>
+      <div class="form-group">
+        <label>Confirm Password</label>
+        <input type="password" id="confirm-password">
+      </div>
+      <div id="error"></div>
+      <button id="btn-password" onclick="savePassword()">Next</button>
+    </div>
+  </div>
+
+  <!-- Screen 4: Success -->
+  <div id="screen-4" class="screen">
+    <div class="bg" style="background-image: url('assets/wizard/success.webp')"></div>
+    <div class="content">
+      <h1>All set!</h1>
+      <p>Your camera is ready. Access the dashboard below.</p>
+      <p id="urls">Local: http://localhost:3000</p>
+      <button onclick="finishWizard()">Open Dashboard</button>
+    </div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+    let selectedCamera = null;
+
+    async function loadCameras() {
+      const select = document.getElementById('camera-select');
+      const btn = document.getElementById('btn-camera');
+      const cameras = await ipcRenderer.invoke('get-cameras');
+      
+      select.innerHTML = '';
+      if (cameras.length === 0) {
+        select.innerHTML = '<option value="">No cameras detected (ensure they are plugged in)</option>';
+      } else {
+        cameras.forEach(cam => {
+          const opt = document.createElement('option');
+          opt.value = JSON.stringify(cam);
+          opt.text = cam.name;
+          select.appendChild(opt);
+        });
+        btn.disabled = false;
+      }
+    }
+
+    function nextScreen(num) {
+      if (num === 3) {
+        const select = document.getElementById('camera-select');
+        if (!select.value) return;
+        selectedCamera = JSON.parse(select.value);
+      }
+      if (num === 2) {
+        loadCameras();
+      }
+      if (num === 4) {
+        loadUrls();
+      }
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById('screen-' + num).classList.add('active');
+    }
+
+    async function savePassword() {
+      const user = document.getElementById('username').value.trim();
+      const pass = document.getElementById('password').value;
+      const conf = document.getElementById('confirm-password').value;
+      const errorDiv = document.getElementById('error');
+      errorDiv.innerText = '';
+
+      if (!user) { errorDiv.innerText = 'Username is required.'; return; }
+      if (pass.length < 6) { errorDiv.innerText = 'Password must be at least 6 characters.'; return; }
+      if (pass !== conf) { errorDiv.innerText = 'Passwords do not match.'; return; }
+
+      const btn = document.getElementById('btn-password');
+      btn.disabled = true;
+      btn.innerText = 'Saving...';
+
+      try {
+        const { hash, secret } = await ipcRenderer.invoke('hash-password', pass);
+        if (!hash || !secret) throw new Error("Failed to generate hash");
+
+        await ipcRenderer.invoke('save-env', {
+          cameraSource: selectedCamera.source,
+          cameraDevice: selectedCamera.id,
+          username: user,
+          hash,
+          secret
+        });
+        nextScreen(4);
+      } catch (err) {
+        errorDiv.innerText = 'Error saving password.';
+        btn.disabled = false;
+        btn.innerText = 'Next';
+      }
+    }
+
+    async function loadUrls() {
+      const tailscaleUrl = await ipcRenderer.invoke('get-tailscale-url');
+      const p = document.getElementById('urls');
+      if (tailscaleUrl) {
+        p.innerText = `Local: http://localhost:3000\nTailscale: ${tailscaleUrl}`;
+      }
+    }
+
+    function finishWizard() {
+      ipcRenderer.invoke('finish-wizard');
+    }
+  </script>
+</body>
+</html>
