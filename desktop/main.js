@@ -9,7 +9,9 @@ let mainWindow;
 let cameraProcess;
 let serverProcess;
 
-const APP_DIR = path.resolve(__dirname, '../app');
+const APP_DIR = app.isPackaged 
+  ? path.join(process.resourcesPath, 'app')
+  : path.resolve(__dirname, '../app');
 const ENV_FILE = path.join(APP_DIR, '.env.local');
 
 // Get port from .env.local if it exists
