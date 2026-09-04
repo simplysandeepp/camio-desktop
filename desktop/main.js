@@ -286,7 +286,7 @@ app.on('window-all-closed', () => {
 });
 
 function terminateChildren() {
-  const procs = [cameraProcess, serverProcess].filter((p) => p && p.exitCode === null);
+  const procs = [cameraProcess, serverProcess].filter((p) => p && p.exitCode === null && p.signalCode === null);
   if (procs.length === 0) return Promise.resolve();
 
   return new Promise((resolve) => {
@@ -300,7 +300,7 @@ function terminateChildren() {
     };
     const forceKillTimer = setTimeout(() => {
       for (const p of procs) {
-        if (p.exitCode === null) p.kill('SIGKILL');
+        if (p.exitCode === null && p.signalCode === null) p.kill('SIGKILL');
       }
     }, 5000);
 
