@@ -210,6 +210,8 @@
       const p = document.getElementById('urls');
       if (tailscaleUrl) {
         p.innerText = `Local: http://localhost:3000\nTailscale: ${tailscaleUrl}`;
+      } else {
+        p.innerText = `Local: http://localhost:3000\nTailscale: Not detected or not logged in`;
       }
     }
 
