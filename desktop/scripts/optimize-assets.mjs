@@ -34,6 +34,8 @@ async function main() {
         console.log('Created icon.icns');
     } catch (e) {
         console.log('iconutil failed, skipping .icns generation (maybe not on mac?)');
+    } finally {
+        fs.rmSync(iconsetDir, { recursive: true, force: true });
     }
     // Also save simple pngs for linux
     await sharp(iconPath).resize(512, 512).png({ quality: 80, compressionLevel: 9 }).toFile(path.join(ICONS_DIR, 'icon-512x512.png'));

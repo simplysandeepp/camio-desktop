@@ -19,5 +19,6 @@ exports.default = async function afterPack(context) {
   }
 
   console.log(`[afterPack] copying node_modules -> ${dest}`);
+  fs.rmSync(dest, { recursive: true, force: true });
   fs.cpSync(src, dest, { recursive: true, dereference: true });
 };
