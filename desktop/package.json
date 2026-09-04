@@ -40,7 +40,10 @@
       "icon": "assets/icons/icon.icns"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "assets/icons",
       "category": "Utility"
     }
@@ -52,11 +55,9 @@
   },
   "license": "ISC",
   "type": "commonjs",
-  "dependencies": {
-    "sharp": "^0.35.4"
-  },
   "devDependencies": {
     "electron": "^44.0.0",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "sharp": "^0.35.4"
   }
 }
