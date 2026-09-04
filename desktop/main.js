@@ -241,10 +241,14 @@ function setupIpcHandlers() {
 
   ipcMain.handle('get-tailscale-url', async () => {
     try {
-      const tsStatus = execSync('tailscale status', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+      const { exec } = require('child_process');
+      const util = require('util');
+      const execAsync = util.promisify(exec);
+      
+      const { stdout: tsStatus } = await execAsync('tailscale status');
       if (tsStatus.includes('Logged in')) {
-        const ip = execSync('tailscale ip -4', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-        return `http://${ip}:${appPort}`;
+        const { stdout: ipOut } = await execAsync('tailscale ip -4');
+        return `http://${ipOut.trim()}:${appPort}`;
       }
     } catch {}
     return null;
