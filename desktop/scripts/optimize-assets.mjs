@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 
-const SOURCE_DIR = path.resolve('../../camio/camio-app/camio-assests');
+const SOURCE_DIR = path.resolve('../../camio-app/camio-assests');
 const ICONS_DIR = path.resolve('./assets/icons');
 const WIZARD_DIR = path.resolve('./assets/wizard');
 const BANNER_DIR = path.resolve('./assets');
